@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+scikit-learn
+pandas
+numpy
+torch
+transformers
+requests
+beautifulsoup4
+matplotlib
+seaborn
+jupyter
+nltk
+python-multipart
+joblib

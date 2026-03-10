@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>News Topic Classifier</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📰 News Topic Classifier</h1>
+      <p class="subtitle">Paste a news article snippet and discover its topic using machine learning.</p>
+    </header>
+
+    <main>
+      <section class="input-section">
+        <label for="article-input">Article Text</label>
+        <textarea
+          id="article-input"
+          rows="6"
+          placeholder="Paste your news article text here… (e.g. 'The home team clinched the championship title with a stunning 3-1 victory…')"
+        ></textarea>
+        <div class="btn-row">
+          <button id="classify-btn" class="btn-primary">Classify</button>
+          <button id="clear-btn" class="btn-secondary">Clear</button>
+        </div>
+      </section>
+
+      <div id="spinner" class="spinner hidden" aria-label="Loading"></div>
+      <div id="error-box" class="error-box hidden" role="alert"></div>
+
+      <section id="results-section" class="results-section hidden">
+        <h2>Result</h2>
+        <div class="result-header">
+          <span id="category-badge" class="category-badge"></span>
+          <span id="confidence-label" class="confidence-label"></span>
+        </div>
+
+        <h3>All Category Scores</h3>
+        <div id="scores-container" class="scores-container"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Powered by TF-IDF + scikit-learn &bull; <a href="/docs" target="_blank">API Docs</a></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
