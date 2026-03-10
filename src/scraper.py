@@ -30,9 +30,9 @@ class NewsScraper:
         'Accept': 'text/html,application/xhtml+xml',
     }
 
-    def __init__(self, delay: float = 1.0, max_content_length: int = 2000):
+    def __init__(self, delay: float = 1.0, max_content_chars: int = 2000):
         self.delay = delay  # Polite delay between requests
-        self.max_content_length = max_content_length
+        self.max_content_chars = max_content_chars  # Max characters to extract from article body
         self.session = requests.Session()
         self.session.headers.update(self.DEFAULT_HEADERS)
 
@@ -66,7 +66,7 @@ class NewsScraper:
                 content = ' '.join(p.get_text(strip=True) for p in soup.find_all('p'))
 
             time.sleep(self.delay)
-            return {'title': title, 'content': content[:self.max_content_length], 'url': url}
+            return {'title': title, 'content': content[:self.max_content_chars], 'url': url}
         except Exception as e:
             logger.warning(f"Failed to scrape {url}: {e}")
             return None

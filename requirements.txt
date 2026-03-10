@@ -4,7 +4,7 @@ scikit-learn
 pandas
 numpy
 torch
-transformers
+# transformers  # Optional: for fine-tuning pretrained HuggingFace models
 requests
 beautifulsoup4
 matplotlib

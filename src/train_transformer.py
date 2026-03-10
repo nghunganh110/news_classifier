@@ -109,6 +109,8 @@ class SimpleTransformerClassifier(nn.Module):
     def forward(self, x):
         # x: (batch, seq_len)
         padding_mask = (x == PAD_IDX)  # (batch, seq_len)
+        # Scale embeddings by sqrt(d_model) to prevent positional encodings from
+        # dominating the learned embeddings early in training (Vaswani et al., 2017)
         emb = self.embedding(x) * math.sqrt(self.embedding.embedding_dim)
         emb = self.pos_encoding(emb)
         out = self.transformer(emb, src_key_padding_mask=padding_mask)

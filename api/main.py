@@ -98,6 +98,10 @@ app = FastAPI(
 )
 
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+# NOTE: The default CORS origin '*' is suitable for local development.
+# For production deployments, set the CORS_ORIGINS environment variable to
+# a comma-separated list of trusted domains, e.g.:
+#   CORS_ORIGINS=https://yourdomain.com uvicorn api.main:app
 
 app.add_middleware(
     CORSMiddleware,
