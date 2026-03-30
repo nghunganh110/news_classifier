@@ -1,4 +1,4 @@
-const API_BASE = '';  // same origin; change to 'http://localhost:8000' for dev
+const API_BASE = 'http://localhost:8000';  // same origin; change to 'http://localhost:8000' for dev
 
 const textarea     = document.getElementById('article-input');
 const classifyBtn  = document.getElementById('classify-btn');

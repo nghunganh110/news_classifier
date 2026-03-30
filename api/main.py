@@ -7,6 +7,7 @@ from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,12 +16,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CATEGORIES = ["business", "entertainment", "health", "politics", "science", "sports", "technology"]
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'tfidf_model.pkl')
+MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'transformer_model.pt')
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend')
 
 model_data = {}
 
-
+"""
 def load_model():
     global model_data
     try:
@@ -34,6 +35,24 @@ def load_model():
     except Exception as e:
         logger.warning(f"Could not load model: {e}. Using mock predictions.")
         return False
+"""    
+def load_model():
+    global model_data
+    try:
+        import torch
+        from src.train_transformer import TransformerTrainer
+        
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        trainer = TransformerTrainer(num_classes=len(CATEGORIES), device=device)
+        trainer.load(MODEL_PATH.replace('tfidf_model.pkl', 'transformer_model.pt'))
+        
+        model_data['trainer'] = trainer
+        model_data['model_type'] = 'transformer'
+        logger.info("Loaded Transformer model")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not load transformer model: {e}. Using mock predictions.")
+        return False
 
 
 def mock_predict(text: str):
@@ -46,7 +65,7 @@ def mock_predict(text: str):
     category = max(scores, key=scores.get)
     return category, scores[category], scores
 
-
+"""
 def predict_text(text: str):
     if 'pipeline' not in model_data:
         return mock_predict(text)
@@ -82,7 +101,20 @@ def predict_text(text: str):
         confidence = 1.0
 
     return pred, confidence, all_scores
-
+"""
+def predict_text(text: str):
+    if 'trainer' not in model_data:
+        return mock_predict(text)
+    
+    trainer = model_data['trainer']
+    preds, probs = trainer.predict([text])
+    pred = preds[0]
+    prob = probs[0]
+    
+    all_scores = {CATEGORIES[i]: round(float(prob[i]), 4) for i in range(len(CATEGORIES))}
+    confidence = round(float(max(prob)), 4)
+    
+    return pred, confidence, all_scores
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -126,14 +158,14 @@ class BatchPredictRequest(BaseModel):
     texts: List[str]
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    index_path = os.path.join(FRONTEND_DIR, 'index.html')
-    if os.path.exists(index_path):
-        with open(index_path, 'r') as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>News Classifier API</h1><p>Visit /docs for API documentation.</p>")
-
+#* @app.get("/", response_class=HTMLResponse)
+#async def root():
+#   index_path = os.path.join(FRONTEND_DIR, 'index.html')
+#   if os.path.exists(index_path):
+#       with open(index_path, 'r') as f:
+#           return HTMLResponse(content=f.read())
+#    return HTMLResponse(content="<h1>News Classifier API</h1><p>Visit /docs for API documentation.</p>")
+#
 
 @app.get("/health")
 async def health():
@@ -169,3 +201,5 @@ async def predict_batch(request: BatchPredictRequest):
         except Exception as e:
             results.append({"error": str(e)})
     return {"predictions": results}
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")

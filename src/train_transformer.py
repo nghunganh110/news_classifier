@@ -202,7 +202,7 @@ class TransformerTrainer:
         print(f"Transformer model saved to {path}")
 
     def load(self, path):
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.vocab = checkpoint['vocab']
         self.label2idx = checkpoint['label2idx']
         self.idx2label = checkpoint['idx2label']
