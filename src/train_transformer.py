@@ -194,7 +194,8 @@ class TransformerTrainer:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save({
             'model_state': self.model.state_dict(),
-            'vocab': self.vocab,
+            'vocab_word2idx': self.vocab.word2idx,  # Save as dict instead of Vocabulary object
+            'vocab_idx2word': self.vocab.idx2word,
             'label2idx': self.label2idx,
             'idx2label': self.idx2label,
             'num_classes': self.num_classes,
@@ -203,17 +204,22 @@ class TransformerTrainer:
 
     def load(self, path):
         checkpoint = torch.load(path, map_location=self.device, weights_only=False)
-        self.vocab = checkpoint['vocab']
+    
+        # Reconstruct Vocabulary from saved dicts
+        self.vocab = Vocabulary()
+        self.vocab.word2idx = checkpoint['vocab_word2idx']
+        self.vocab.idx2word = checkpoint['vocab_idx2word']
+    
         self.label2idx = checkpoint['label2idx']
         self.idx2label = checkpoint['idx2label']
         self.num_classes = checkpoint['num_classes']
+    
         self.model = SimpleTransformerClassifier(
             vocab_size=len(self.vocab),
             num_classes=self.num_classes,
         ).to(self.device)
         self.model.load_state_dict(checkpoint['model_state'])
         self.model.eval()
-
 
 def main():
     os.makedirs(MODELS_DIR, exist_ok=True)

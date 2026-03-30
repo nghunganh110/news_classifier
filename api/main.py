@@ -16,43 +16,65 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CATEGORIES = ["business", "entertainment", "health", "politics", "science", "sports", "technology"]
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'transformer_model.pt')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models')
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend')
 
 model_data = {}
 
-"""
-def load_model():
+
+def load_tfidf_model():
     global model_data
     try:
         import joblib
-        data = joblib.load(MODEL_PATH)
+        model_path = os.path.join(MODELS_DIR, 'tfidf_model.pkl')
+        data = joblib.load(model_path)
         model_data['pipeline'] = data['pipeline']
         model_data['preprocessor'] = data['preprocessor']
         model_data['label_list'] = data['label_list']
+        model_data['model_type'] = 'tfidf'
         logger.info(f"Loaded TF-IDF model ({data.get('best_model_name', 'unknown')})")
         return True
     except Exception as e:
-        logger.warning(f"Could not load model: {e}. Using mock predictions.")
+        logger.warning(f"Could not load TF-IDF model: {e}")
         return False
-"""    
-def load_model():
+
+ 
+def load_transformer_model():
     global model_data
     try:
         import torch
         from src.train_transformer import TransformerTrainer
         
+        model_path = os.path.join(MODELS_DIR, 'transformer_model.pt')
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         trainer = TransformerTrainer(num_classes=len(CATEGORIES), device=device)
-        trainer.load(MODEL_PATH.replace('tfidf_model.pkl', 'transformer_model.pt'))
+        trainer.load(model_path)
         
         model_data['trainer'] = trainer
         model_data['model_type'] = 'transformer'
         logger.info("Loaded Transformer model")
         return True
     except Exception as e:
-        logger.warning(f"Could not load transformer model: {e}. Using mock predictions.")
+        logger.warning(f"Could not load transformer model: {e}")
         return False
+
+
+def load_model():
+    """Load default model based on MODEL_TYPE env var (transformer or tfidf)"""
+    default_model = os.environ.get('MODEL_TYPE', 'transformer').lower()
+    
+    if default_model == 'tfidf':
+        if load_tfidf_model():
+            return
+        if load_transformer_model():
+            return
+    else:  # transformer (default)
+        if load_transformer_model():
+            return
+        if load_tfidf_model():
+            return
+    
+    logger.warning("No model loaded. Using mock predictions.")
 
 
 def mock_predict(text: str):
@@ -65,56 +87,56 @@ def mock_predict(text: str):
     category = max(scores, key=scores.get)
     return category, scores[category], scores
 
-"""
+
 def predict_text(text: str):
-    if 'pipeline' not in model_data:
-        return mock_predict(text)
-
-    preprocessor = model_data['preprocessor']
-    pipeline = model_data['pipeline']
-    label_list = model_data['label_list']
-
-    processed = preprocessor.preprocess(text)
-    clf = pipeline.named_steps['clf']
-    vectorizer = pipeline.named_steps['tfidf']
-    X = vectorizer.transform([processed])
-
-    # Get probabilities or decision function scores
-    if hasattr(clf, 'predict_proba'):
-        probs = clf.predict_proba(X)[0]
-    elif hasattr(clf, 'decision_function'):
-        df = clf.decision_function(X)[0]
-        import numpy as np
-        e = np.exp(df - df.max())
-        probs = e / e.sum()
-    else:
-        probs = None
-
-    pred = pipeline.predict([processed])[0]
-
-    if probs is not None:
-        all_scores = {label_list[i]: round(float(probs[i]), 4) for i in range(len(label_list))}
-        confidence = round(float(max(probs)), 4)
-    else:
-        all_scores = {cat: 0.0 for cat in label_list}
-        all_scores[pred] = 1.0
-        confidence = 1.0
-
-    return pred, confidence, all_scores
-"""
-def predict_text(text: str):
-    if 'trainer' not in model_data:
+    """Predict using loaded model"""
+    if 'model_type' not in model_data:
         return mock_predict(text)
     
-    trainer = model_data['trainer']
-    preds, probs = trainer.predict([text])
-    pred = preds[0]
-    prob = probs[0]
+    if model_data['model_type'] == 'tfidf':
+        # TF-IDF prediction
+        preprocessor = model_data['preprocessor']
+        pipeline = model_data['pipeline']
+        label_list = model_data['label_list']
+
+        processed = preprocessor.preprocess(text)
+        clf = pipeline.named_steps['clf']
+        vectorizer = pipeline.named_steps['tfidf']
+        X = vectorizer.transform([processed])
+
+        if hasattr(clf, 'predict_proba'):
+            probs = clf.predict_proba(X)[0]
+        elif hasattr(clf, 'decision_function'):
+            df = clf.decision_function(X)[0]
+            import numpy as np
+            e = np.exp(df - df.max())
+            probs = e / e.sum()
+        else:
+            probs = None
+
+        pred = pipeline.predict([processed])[0]
+
+        if probs is not None:
+            all_scores = {label_list[i]: round(float(probs[i]), 4) for i in range(len(label_list))}
+            confidence = round(float(max(probs)), 4)
+        else:
+            all_scores = {cat: 0.0 for cat in label_list}
+            all_scores[pred] = 1.0
+            confidence = 1.0
+
+        return pred, confidence, all_scores
     
-    all_scores = {CATEGORIES[i]: round(float(prob[i]), 4) for i in range(len(CATEGORIES))}
-    confidence = round(float(max(prob)), 4)
-    
-    return pred, confidence, all_scores
+    else:  # transformer
+        trainer = model_data['trainer']
+        preds, probs = trainer.predict([text])
+        pred = preds[0]
+        prob = probs[0]
+        
+        all_scores = {CATEGORIES[i]: round(float(prob[i]), 4) for i in range(len(CATEGORIES))}
+        confidence = round(float(max(prob)), 4)
+        
+        return pred, confidence, all_scores
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -130,10 +152,6 @@ app = FastAPI(
 )
 
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
-# NOTE: The default CORS origin '*' is suitable for local development.
-# For production deployments, set the CORS_ORIGINS environment variable to
-# a comma-separated list of trusted domains, e.g.:
-#   CORS_ORIGINS=https://yourdomain.com uvicorn api.main:app
 
 app.add_middleware(
     CORSMiddleware,
@@ -158,18 +176,72 @@ class BatchPredictRequest(BaseModel):
     texts: List[str]
 
 
-#* @app.get("/", response_class=HTMLResponse)
-#async def root():
-#   index_path = os.path.join(FRONTEND_DIR, 'index.html')
-#   if os.path.exists(index_path):
-#       with open(index_path, 'r') as f:
-#           return HTMLResponse(content=f.read())
-#    return HTMLResponse(content="<h1>News Classifier API</h1><p>Visit /docs for API documentation.</p>")
-#
+class ModelStatusResponse(BaseModel):
+    current_model: str
+    available_models: list
+
+
+class SelectModelRequest(BaseModel):
+    model_type: str  # "transformer" or "tfidf"
+
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model_loaded": 'pipeline' in model_data}
+    return {
+        "status": "ok",
+        "model_loaded": 'model_type' in model_data,
+        "current_model": model_data.get('model_type', 'none')
+    }
+
+
+@app.get("/model-status", response_model=ModelStatusResponse)
+async def model_status():
+    """Get current model and available models"""
+    return {
+        "current_model": model_data.get('model_type', 'none'),
+        "available_models": ["transformer", "tfidf"]
+    }
+
+
+@app.post("/select-model")
+async def select_model(request: SelectModelRequest):
+    """Switch to a different model"""
+    model_type = request.model_type.lower()
+    
+    if model_type not in ['transformer', 'tfidf']:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model type. Choose 'transformer' or 'tfidf'"
+        )
+    
+    try:
+        if model_type == 'tfidf':
+            if load_tfidf_model():
+                return {
+                    "message": f"Successfully switched to TF-IDF model",
+                    "current_model": model_data['model_type']
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to load TF-IDF model. Check if models/tfidf_model.pkl exists."
+                )
+        else:  # transformer
+            if load_transformer_model():
+                return {
+                    "message": f"Successfully switched to Transformer model",
+                    "current_model": model_data['model_type']
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to load Transformer model. Check if models/transformer_model.pt exists."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error switching models: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/categories")
@@ -201,5 +273,6 @@ async def predict_batch(request: BatchPredictRequest):
         except Exception as e:
             results.append({"error": str(e)})
     return {"predictions": results}
+
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")
