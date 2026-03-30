@@ -250,7 +250,3 @@ jupyter notebook notebooks/analysis.ipynb
 ```
 
 ---
-
-## License
-
-MIT
